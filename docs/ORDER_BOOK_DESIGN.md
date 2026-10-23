@@ -1,0 +1,3 @@
+## Empty-Side Representation
+
+When the buy side contains no orders, `get_best_bid()` returns `None`. Similarly, when the sell side contains no orders, `get_best_ask()` returns `None`. This distinguishes the absence of an available price from a numerical price value. Returning `0` could incorrectly suggest that a valid price level exists at zero. Using `None` therefore makes the empty state explicit and unambiguous.
