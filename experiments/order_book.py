@@ -30,6 +30,35 @@ class OrderBook:
 
         return min(self.sell_levels)
 
+    def process_order(self, order: Order):
+        best_bid = self.get_best_bid()
+        best_ask = self.get_best_ask()
+        if order.side == "BUY":
+            if best_ask is not None and order.price >= best_ask:
+                level = self.sell_levels[best_ask]
+                resting_order = level.get_first_order()
+                order.remaining_quantity = 0
+                resting_order.remaining_quantity = 0
+                level.remove_first_order()
+                if level.is_empty():
+                    self.sell_levels.pop(best_ask)
+            else:
+                self.add_resting_order(order)
+
+        else:
+            if best_bid is not None and order.price <= best_bid:
+                level = self.buy_levels[best_bid]
+                resting_order = level.get_first_order()
+                order.remaining_quantity = 0
+                resting_order.remaining_quantity = 0
+                level.remove_first_order()
+                if level.is_empty():
+                    self.buy_levels.pop(best_bid)
+            else:
+                self.add_resting_order(order)
+
+        
+
 
 order1 = Order(
     "BUY001",

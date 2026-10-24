@@ -58,3 +58,50 @@ def test_empty_order_book():
     book = OrderBook()
     assert book.get_best_bid() is None
     assert book.get_best_ask() is None
+
+def test_crossing_buy_detects_resting_sell():
+    book = OrderBook()
+
+    sell = Order("SELL001", "SELL", 105.0, 10, 10, 1)
+    buy = Order("BUY001", "BUY", 108.0, 10, 10, 2)
+
+    book.add_resting_order(sell)
+    book.process_order(buy)
+
+    assert book.get_best_ask() is None
+
+def test_crossing_sell_executes_against_resting_buy():
+    book = OrderBook()
+
+    buy = Order("BUY001", "BUY", 100.0, 10, 10, 1)
+    sell = Order("SELL001", "SELL", 98.0, 10, 10, 2)
+
+    book.add_resting_order(buy)
+    book.process_order(sell)
+
+    assert book.get_best_bid() is None
+
+def test_non_crossing_buy_rests_in_book():
+    book = OrderBook()
+
+    sell = Order("SELL001", "SELL", 105.0, 10, 10, 1)
+    buy = Order("BUY001", "BUY", 100.0, 10, 10, 2)
+
+    book.add_resting_order(sell)
+    book.process_order(buy)
+
+    assert book.get_best_bid() == 100.0
+    assert book.get_best_ask() == 105.0
+
+def test_non_crossing_sell_rests_in_book():
+    book = OrderBook()
+
+    buy = Order("BUY001", "BUY", 100.0, 10, 10, 1)
+    sell = Order("SELL001", "SELL", 105.0, 10, 10, 2)
+
+    book.add_resting_order(buy)
+    book.process_order(sell)
+
+    assert book.get_best_bid() == 100.0
+    assert book.get_best_ask() == 105.0
+    
