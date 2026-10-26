@@ -1,27 +1,37 @@
 # MicroLOB-Sim
 
-**Phase 1: CS Foundations & The Matching Engine**  
-*Status: Active Development*
+**Status:** Active development
 
-## Objective
-MicroLOB-Sim is a computational research project exploring limit order book mechanics, market microstructure, and agent-based simulation from first principles.
+## Overview
 
-Phase 1 focuses on designing, testing, and measuring a deterministic matching engine in Python supporting:
-- Price-time priority (FIFO at price levels)
-- Partial fills and multi-level executions
-- Order state tracking and cancellations
-- Invariant checks (quantity conservation, non-crossed books)
-- Deterministic event replay
+MicroLOB-Sim is a Python project exploring limit order book mechanics and market microstructure through a transparent implementation built from first principles.
 
-## Explicit Non-Goals (Phase 1)
-- No live trading or exchange connectivity
-- No price prediction or automated trading strategies
-- No complex stochastic agent behaviors
-- No production-scale asynchronous infrastructure
+The current implementation includes:
+
+- An `Order` model with basic side, price, and quantity validation.
+- FIFO queues at individual price levels.
+- Separate buy-side and sell-side order book structures.
+- Best-bid and best-ask retrieval.
+- Basic crossing-order matching.
+- Quantity-aware partial fills.
+- Removal of fully filled resting orders and empty price levels.
+
+The matching implementation currently processes at most one resting order per incoming order. Matching across multiple resting orders and price levels remains to be implemented.
+
+## Current Limitations
+
+- Order cancellation is not implemented.
+- Structured trade records are not implemented.
+- Multi-level matching is not implemented.
+- Event recording and replay are not implemented.
+- Broader invariant checks require further implementation and testing.
 
 ## Getting Started
-```bash
+
+Create and activate a virtual environment, install dependencies, and run the tests.
+
+```powershell
 python -m venv .venv
-.venv\Scripts\activate
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 pytest

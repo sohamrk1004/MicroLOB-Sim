@@ -2,15 +2,15 @@
 
 ## 1. Continuous Double Auction
 
-A continuous double auction is a market mechanism where buyers and sellers continuously submit orders to the market. Buy orders compete with other buy orders, while sell orders compete with other sell orders. When compatible buy and sell prices meet, a trade can occur.
+A continuous double auction is a market mechanism in which buyers and sellers continuously submit orders. Buy orders compete with other buy orders, while sell orders compete with other sell orders. When compatible buy and sell prices meet, a trade can occur.
 
 ## 2. Bid
 
-A bid is the price a buyer is willing to pay for an asset. The best bid is the highest price currently available among all BUY orders in the order book.
+A bid is the price a buyer is willing to pay for an asset. The best bid is the highest price currently available among BUY orders in the order book.
 
 ## 3. Ask
 
-An ask is the price at which a seller is willing to sell an asset. The best ask is the lowest price currently available among all SELL orders in the order book.
+An ask is the price at which a seller is willing to sell an asset. The best ask is the lowest price currently available among SELL orders in the order book.
 
 ## 4. Bid-Ask Spread
 
@@ -18,11 +18,11 @@ The bid-ask spread is the difference between the best ask and the best bid.
 
 Spread = Best Ask - Best Bid
 
-A smaller spread means the best buying and selling prices are closer together.
+A smaller spread means the best buying and selling prices are closer together. The spread is defined when both sides of the book have available prices.
 
 ## 5. Limit Order
 
-A limit order specifies a price constraint at which the trader is willing to buy or sell. If the order cannot immediately trade at a compatible price, it can remain in the order book waiting for a matching order.
+A limit order specifies a price constraint at which a trader is willing to buy or sell. If it cannot immediately trade at a compatible price, it can remain in the order book.
 
 For example, a BUY limit order at ₹100 means the buyer is willing to pay at most ₹100.
 
@@ -30,19 +30,17 @@ For example, a BUY limit order at ₹100 means the buyer is willing to pay at mo
 
 A market order prioritizes immediate execution rather than specifying a fixed execution price. A market BUY consumes available sell liquidity starting from the lowest ask, while a market SELL consumes available buy liquidity starting from the highest bid.
 
-If there is not enough quantity at the best price, the order can continue to the next available price level.
+If insufficient quantity is available at the best price, a market order can continue to the next available price level. Actual execution depends on available liquidity and the market's matching rules.
 
 ## 7. Liquidity
 
-Liquidity refers to the availability of tradable quantity at or near the current market price. When sufficient quantity is available at the best price, a large order can execute without moving across many price levels.
+Liquidity refers to the availability of tradable quantity at or near the current market price. When sufficient quantity is available at the best price, an order may execute without consuming additional price levels.
 
-When available quantity is small, a large market order may consume several price levels. Therefore, liquidity affects how much an order can trade near the current price and how much price-level movement is required to complete the order.
+When available quantity is small, a large market order may consume several price levels. Liquidity therefore affects how much quantity can trade near the current price and how far an order may need to move through the book to complete execution.
 
 ## 8. Order Book Example
 
-Consider the following order book:
-
-ASK SIDE
+Consider the following ask side, shown from the highest ask to the lowest ask:
 
 | Price | Quantity |
 |---:|---:|
@@ -51,7 +49,7 @@ ASK SIDE
 | 103 | 20 |
 | 102 | 10 |
 
----
+And the bid side:
 
 | Price | Quantity |
 |---:|---:|
@@ -59,8 +57,6 @@ ASK SIDE
 | 100 | 80 |
 | 99 | 60 |
 | 98 | 40 |
-
-BID SIDE
 
 Best Bid = ₹101
 
@@ -80,16 +76,14 @@ Suppose the ask side is:
 
 A market BUY order for 40 units arrives.
 
-The first 20 units execute at ₹101 because ₹101 is the lowest available ask. The remaining 20 units execute at ₹102.
-
-Therefore:
+Under standard price-priority matching:
 
 - 20 units execute at ₹101.
-- 20 units execute at ₹102.
-- 10 units remain available at ₹102.
-- The order does not reach ₹103 because its full quantity has already been executed.
+- The remaining 20 units execute at ₹102.
+- 10 units remain at ₹102 from the original resting order.
+- The order does not reach ₹103 because its quantity has been fully executed.
 
-This demonstrates that a market BUY consumes liquidity from the lowest ask upward.
+This illustrates how a market BUY consumes liquidity from the lowest ask upward. This is a general market example, not a claim that the current implementation supports market orders or multi-level execution.
 
 ## 10. Market Sell Example
 
@@ -103,20 +97,18 @@ Suppose the bid side is:
 
 A market SELL order for 40 units arrives.
 
-The first 20 units execute at ₹100 because ₹100 is the highest available bid. The remaining 20 units execute at ₹99.
-
-Therefore:
+Under standard price-priority matching:
 
 - 20 units execute at ₹100.
-- 20 units execute at ₹99.
-- 10 units remain available at ₹99.
-- The order does not reach ₹98 because its full quantity has already been executed.
+- The remaining 20 units execute at ₹99.
+- 10 units remain at ₹99 from the original resting order.
+- The order does not reach ₹98 because its quantity has been fully executed.
 
-This demonstrates that a market SELL consumes liquidity from the highest bid downward.
+This illustrates how a market SELL consumes liquidity from the highest bid downward. This is a general market example, not a claim that the current implementation supports market orders or multi-level execution.
 
 ## 11. Liquidity Example
 
-Consider two order books.
+Consider two ask books.
 
 ### Book A
 
@@ -136,37 +128,35 @@ Consider two order books.
 
 A market BUY order for 50 units arrives.
 
-In Book A, all 50 units can execute at ₹101 because 1000 units are available at that price. The order does not need to move to another price level.
+In Book A, all 50 units can execute at ₹101 because 1000 units are available at that price.
 
-In Book B, only 10 units are available at ₹101. The remaining quantity must consume liquidity at ₹102, ₹103, ₹104, and ₹105.
+In Book B, the order would consume 10 units at each of the five price levels, assuming standard price-priority matching and no intervening orders.
 
-This shows that liquidity is not simply the total quantity somewhere in the order book. What matters is how much tradable quantity is available at or near the current price. Lower available quantity near the best price can cause a large market order to traverse multiple price levels.
+This shows that liquidity is not simply the total quantity somewhere in the book. The distribution of quantity across prices determines how much a large order can execute near the best price.
 
 ## 12. Connection to MicroLOB-Sim
 
-The `Order` object created earlier represents the basic information needed for an order in the simulated market. Its fields include the order ID, side, price, original quantity, remaining quantity, and timestamp.
+The `Order` model represents the basic information associated with an order, including its ID, side, price, original quantity, remaining quantity, and timestamp.
 
-BUY and SELL orders will eventually be organized into an order book. The order book will need to determine the best bid and best ask from the available orders.
+The `OrderBook` maintains separate BUY and SELL price levels. It determines the best bid and best ask from the prices currently present in the book.
 
-The spread can then be calculated as:
+The spread can be calculated as:
 
 Spread = Best Ask - Best Bid
 
-A matching engine will use these prices to determine whether incoming orders can trade. Marketable orders will consume available liquidity from the appropriate side of the book.
+The current matching method checks whether an incoming limit order crosses the best opposing price. It executes against the first resting order at that price level and updates both orders' remaining quantities.
 
-Liquidity will therefore directly affect how an order executes. If sufficient quantity is available at the best price, execution can remain at that level. If not, the matching engine may need to consume multiple price levels.
-
-Understanding these concepts is necessary before implementing the OrderBook and matching engine.
+The implementation currently processes at most one resting order per incoming order. It does not yet support market orders or sequential matching across multiple price levels.
 
 ## 13. Key Takeaways
 
 - Best bid = highest available BUY price.
 - Best ask = lowest available SELL price.
-- Spread = Best Ask - Best Bid.
+- Spread = Best Ask - Best Bid, when both sides have prices.
 - A limit order specifies a price constraint.
 - A market order prioritizes immediate execution.
-- Market BUY consumes the lowest asks first.
-- Market SELL consumes the highest bids first.
-- Liquidity is the availability of tradable quantity at or near the current price.
-- Limited liquidity can cause a large market order to consume multiple price levels.
-- These concepts form the foundation for the future OrderBook and matching engine in MicroLOB-Sim.
+- Market BUY orders consume the lowest asks first.
+- Market SELL orders consume the highest bids first.
+- Liquidity describes the availability of tradable quantity at or near the current price.
+- Limited liquidity can cause a large order to consume multiple price levels.
+- The current simulator implements basic crossing-limit-order matching and quantity-aware execution, but not market orders or multi-level matching.
