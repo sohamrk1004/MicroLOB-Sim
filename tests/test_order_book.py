@@ -225,3 +225,84 @@ def test_equal_quantity_orders_fully_fill():
     assert resting_sell.remaining_quantity == 0
     assert incoming_buy.remaining_quantity == 0
     assert book.get_best_ask() is None
+
+
+def test_partial_fill_preserves_original_quantities():
+    book = OrderBook()
+    resting_sell = Order("S1", "SELL", 100, 10, 10, 1)
+    incoming_buy = Order("B1", "BUY", 100, 4, 4, 2)
+
+    book.add_resting_order(resting_sell)
+    book.process_order(incoming_buy)
+
+    assert resting_sell.original_quantity == 10
+    assert incoming_buy.original_quantity == 4
+    assert resting_sell.remaining_quantity == 6
+    assert incoming_buy.remaining_quantity == 0
+
+
+def test_partial_fill_quantities_never_become_negative():
+    book = OrderBook()
+    resting_sell = Order("S1", "SELL", 100, 7, 7, 1)
+    incoming_buy = Order("B1", "BUY", 100, 3, 3, 2)
+
+    book.add_resting_order(resting_sell)
+    book.process_order(incoming_buy)
+
+    assert resting_sell.remaining_quantity >= 0
+    assert incoming_buy.remaining_quantity >= 0
+
+
+def test_filled_resting_sell_is_removed():
+    book = OrderBook()
+    resting_sell = Order("S1", "SELL", 100, 4, 4, 1)
+    incoming_buy = Order("B1", "BUY", 100, 4, 4, 2)
+
+    book.add_resting_order(resting_sell)
+    book.process_order(incoming_buy)
+
+    assert resting_sell.remaining_quantity == 0
+    assert 100 not in book.sell_levels
+    assert incoming_buy.remaining_quantity == 0
+
+
+def test_filled_resting_buy_is_removed():
+    book = OrderBook()
+    resting_buy = Order("B1", "BUY", 100, 4, 4, 1)
+    incoming_sell = Order("S1", "SELL", 100, 4, 4, 2)
+
+    book.add_resting_order(resting_buy)
+    book.process_order(incoming_sell)
+
+    assert resting_buy.remaining_quantity == 0
+    assert 100 not in book.buy_levels
+    assert incoming_sell.remaining_quantity == 0
+
+
+def test_larger_incoming_sell_remainder_rests_in_book():
+    book = OrderBook()
+    resting_buy = Order("B1", "BUY", 100, 4, 4, 1)
+    incoming_sell = Order("S1", "SELL", 100, 10, 10, 2)
+
+    book.add_resting_order(resting_buy)
+    book.process_order(incoming_sell)
+
+    assert resting_buy.remaining_quantity == 0
+    assert incoming_sell.remaining_quantity == 6
+    assert book.get_best_bid() is None
+    assert book.get_best_ask() == 100
+    assert book.sell_levels[100].get_first_order() is incoming_sell
+
+
+def test_non_crossing_order_is_not_executed():
+    book = OrderBook()
+    resting_sell = Order("S1", "SELL", 105, 10, 10, 1)
+    incoming_buy = Order("B1", "BUY", 100, 5, 5, 2)
+
+    book.add_resting_order(resting_sell)
+    book.process_order(incoming_buy)
+
+    assert resting_sell.remaining_quantity == 10
+    assert incoming_buy.remaining_quantity == 5
+    assert book.get_best_bid() == 100
+    assert book.get_best_ask() == 105
