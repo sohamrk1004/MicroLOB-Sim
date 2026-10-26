@@ -1,8 +1,10 @@
+
 from experiments.order_model import Order
 from experiments.limit_level import LimitLevel
 
 
 class OrderBook:
+
     def __init__(self):
         self.buy_levels = {}
         self.sell_levels = {}
@@ -31,98 +33,99 @@ class OrderBook:
         return min(self.sell_levels)
 
     def process_order(self, order: Order):
-        best_bid = self.get_best_bid()
-        best_ask = self.get_best_ask()
         if order.side == "BUY":
+            best_ask = self.get_best_ask()
+
             if best_ask is not None and order.price >= best_ask:
                 level = self.sell_levels[best_ask]
                 resting_order = level.get_first_order()
-                order.remaining_quantity = 0
-                resting_order.remaining_quantity = 0
-                level.remove_first_order()
-                if level.is_empty():
-                    self.sell_levels.pop(best_ask)
+
+                executed_quantity = min(
+                    order.remaining_quantity,
+                    resting_order.remaining_quantity
+                )
+
+                order.remaining_quantity -= executed_quantity
+                resting_order.remaining_quantity -= executed_quantity
+
+                if resting_order.remaining_quantity == 0:
+                    level.remove_first_order()
+
+                    if level.is_empty():
+                        self.sell_levels.pop(best_ask)
+
+                if order.remaining_quantity > 0:
+                    self.add_resting_order(order)
+
             else:
                 self.add_resting_order(order)
 
         else:
+            best_bid = self.get_best_bid()
+
             if best_bid is not None and order.price <= best_bid:
                 level = self.buy_levels[best_bid]
                 resting_order = level.get_first_order()
-                order.remaining_quantity = 0
-                resting_order.remaining_quantity = 0
-                level.remove_first_order()
-                if level.is_empty():
-                    self.buy_levels.pop(best_bid)
+
+                executed_quantity = min(
+                    order.remaining_quantity,
+                    resting_order.remaining_quantity
+                )
+
+                order.remaining_quantity -= executed_quantity
+                resting_order.remaining_quantity -= executed_quantity
+
+                if resting_order.remaining_quantity == 0:
+                    level.remove_first_order()
+
+                    if level.is_empty():
+                        self.buy_levels.pop(best_bid)
+
+                if order.remaining_quantity > 0:
+                    self.add_resting_order(order)
+
             else:
                 self.add_resting_order(order)
 
-        
 
+if __name__ == "__main__":
+    order1 = Order(
+        "BUY001", "BUY", 100.0, 20, 20, 1
+    )
 
-order1 = Order(
-    "BUY001",
-    "BUY",
-    100.0,
-    20,
-    20,
-    1
-)
+    order2 = Order(
+        "BUY002", "BUY", 101.0, 30, 30, 2
+    )
 
-order2 = Order(
-    "BUY002",
-    "BUY",
-    101.0,
-    30,
-    30,
-    2
-)
+    order3 = Order(
+        "BUY003", "BUY", 100.0, 15, 15, 3
+    )
 
-order3 = Order(
-    "BUY003",
-    "BUY",
-    100.0,
-    15,
-    15,
-    3
-)
+    order4 = Order(
+        "SELL001", "SELL", 103.0, 25, 25, 4
+    )
 
-order4 = Order(
-    "SELL001",
-    "SELL",
-    103.0,
-    25,
-    25,
-    4
-)
+    order5 = Order(
+        "SELL002", "SELL", 104.0, 40, 40, 5
+    )
 
-order5 = Order(
-    "SELL002",
-    "SELL",
-    104.0,
-    40,
-    40,
-    5
-)
+    book = OrderBook()
 
+    book.add_resting_order(order1)
+    book.add_resting_order(order2)
+    book.add_resting_order(order3)
+    book.add_resting_order(order4)
+    book.add_resting_order(order5)
 
-book = OrderBook()
+    print("Best bid:", book.get_best_bid())
+    print("Best ask:", book.get_best_ask())
 
-book.add_resting_order(order1)
-book.add_resting_order(order2)
-book.add_resting_order(order3)
-book.add_resting_order(order4)
-book.add_resting_order(order5)
+    print(
+        "Orders at BUY 100:",
+        len(book.buy_levels[100.0].orders)
+    )
 
-print("Best bid:", book.get_best_bid())
-print("Best ask:", book.get_best_ask())
-
-print(
-    "Orders at BUY 100:",
-    len(book.buy_levels[100.0].orders)
-)
-
-print(
-    "First order at BUY 100:",
-    book.buy_levels[100.0].get_first_order().order_id
-)
+    print(
+        "First order at BUY 100:",
+        book.buy_levels[100.0].get_first_order().order_id
+    )
