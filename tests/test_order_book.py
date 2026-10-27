@@ -306,3 +306,94 @@ def test_non_crossing_order_is_not_executed():
     assert incoming_buy.remaining_quantity == 5
     assert book.get_best_bid() == 100
     assert book.get_best_ask() == 105
+
+
+
+def test_two_level_sweep():
+    book = OrderBook()
+    s1 = Order("S1", "SELL", 102, 20, 20, 1)
+    s2 = Order("S2", "SELL", 103, 30, 30, 2)
+    incoming = Order("B1", "BUY", 105, 40, 40, 3)
+
+    book.add_resting_order(s1)
+    book.add_resting_order(s2)
+    book.process_order(incoming)
+
+    assert incoming.remaining_quantity == 0
+    assert s1.remaining_quantity == 0
+    assert s2.remaining_quantity == 10
+    assert book.get_best_ask() == 103
+
+
+def test_three_level_sweep():
+    book = OrderBook()
+    s1 = Order("S1", "SELL", 102, 20, 20, 1)
+    s2 = Order("S2", "SELL", 103, 30, 30, 2)
+    s3 = Order("S3", "SELL", 104, 50, 50, 3)
+    incoming = Order("B1", "BUY", 105, 70, 70, 4)
+
+    for order in (s1, s2, s3):
+        book.add_resting_order(order)
+
+    book.process_order(incoming)
+
+    assert incoming.remaining_quantity == 0
+    assert s1.remaining_quantity == 0
+    assert s2.remaining_quantity == 0
+    assert s3.remaining_quantity == 30
+    assert book.get_best_ask() == 104
+
+
+def test_partial_fill_at_final_level():
+    book = OrderBook()
+    s1 = Order("S1", "SELL", 100, 5, 5, 1)
+    s2 = Order("S2", "SELL", 101, 10, 10, 2)
+    incoming = Order("B1", "BUY", 101, 8, 8, 3)
+
+    book.add_resting_order(s1)
+    book.add_resting_order(s2)
+    book.process_order(incoming)
+
+    assert incoming.remaining_quantity == 0
+    assert s1.remaining_quantity == 0
+    assert s2.remaining_quantity == 7
+    assert book.get_best_ask() == 101
+
+
+def test_multiple_orders_at_same_price():
+    book = OrderBook()
+    s1 = Order("S1", "SELL", 100, 4, 4, 1)
+    s2 = Order("S2", "SELL", 100, 6, 6, 2)
+    s3 = Order("S3", "SELL", 101, 10, 10, 3)
+    incoming = Order("B1", "BUY", 100, 7, 7, 4)
+
+    for order in (s1, s2, s3):
+        book.add_resting_order(order)
+
+    book.process_order(incoming)
+
+    assert incoming.remaining_quantity == 0
+    assert s1.remaining_quantity == 0
+    assert s2.remaining_quantity == 3
+    assert s3.remaining_quantity == 10
+    assert book.get_best_ask() == 100
+    assert len(book.sell_levels[100].orders) == 1
+
+
+def test_emptying_a_price_level():
+    book = OrderBook()
+    s1 = Order("S1", "SELL", 100, 2, 2, 1)
+    s2 = Order("S2", "SELL", 101, 4, 4, 2)
+    s3 = Order("S3", "SELL", 102, 6, 6, 3)
+    incoming = Order("B1", "BUY", 101, 6, 6, 4)
+
+    for order in (s1, s2, s3):
+        book.add_resting_order(order)
+
+    book.process_order(incoming)
+
+    assert incoming.remaining_quantity == 0
+    assert 100 not in book.sell_levels
+    assert 101 not in book.sell_levels
+    assert 102 in book.sell_levels
+    assert book.get_best_ask() == 102
