@@ -1,13 +1,15 @@
 
 from experiments.order_model import Order
 from experiments.limit_level import LimitLevel
-
+from experiments.trade import Trade
 
 class OrderBook:
 
     def __init__(self):
         self.buy_levels = {}
         self.sell_levels = {}
+        self.trades = []
+        self._next_trade_id = 1
 
     def add_resting_order(self, order: Order):
         if order.side == "BUY":
@@ -31,8 +33,33 @@ class OrderBook:
             return None
 
         return min(self.sell_levels)
-
     
+    def _record_trade(
+        self,
+        incoming_order: Order,
+        resting_order: Order,
+        price: float,
+        quantity: int
+    ):
+        if incoming_order.side == "BUY":
+            buy_order_id = incoming_order.order_id
+            sell_order_id = resting_order.order_id
+        else:
+            buy_order_id = resting_order.order_id
+            sell_order_id = incoming_order.order_id
+
+        trade = Trade(
+            trade_id=f"T{self._next_trade_id:06d}",
+            buy_order_id=buy_order_id,
+            sell_order_id=sell_order_id,
+            price=price,
+            quantity=quantity,
+            timestamp=incoming_order.timestamp
+        )
+
+        self.trades.append(trade)
+        self._next_trade_id += 1
+
     def process_order(self, order: Order):
         if order.side == "BUY":
             opposing_levels = self.sell_levels
@@ -57,6 +84,59 @@ class OrderBook:
             executed_quantity = min(
                 order.remaining_quantity,
                 resting_order.remaining_quantity
+            )
+
+            self._record_trade(
+                incoming_order=order,
+                resting_order=resting_order,
+                price=best_price,
+                quantity=executed_quantity
+            )
+
+            order.remaining_quantity -= executed_quantity
+            resting_order.remaining_quantity -= executed_quantity
+
+            if resting_order.remaining_quantity == 0:
+                level.remove_first_order()
+
+                if level.is_empty():
+                    opposing_levels.pop(best_price)
+
+        if order.remaining_quantity > 0:
+            self.add_resting_order(order)
+
+
+    def process_order(self, order: Order):
+        if order.side == "BUY":
+            opposing_levels = self.sell_levels
+            get_best_price = self.get_best_ask
+            is_crossing = lambda: (
+                get_best_price() is not None
+                and order.price >= get_best_price()
+            )
+        else:
+            opposing_levels = self.buy_levels
+            get_best_price = self.get_best_bid
+            is_crossing = lambda: (
+                get_best_price() is not None
+                and order.price <= get_best_price()
+            )
+
+        while order.remaining_quantity > 0 and is_crossing():
+            best_price = get_best_price()
+            level = opposing_levels[best_price]
+            resting_order = level.get_first_order()
+
+            executed_quantity = min(
+                order.remaining_quantity,
+                resting_order.remaining_quantity
+            )
+
+            self._record_trade(
+            incoming_order=order,
+            resting_order=resting_order,
+            price=best_price,
+            quantity=executed_quantity
             )
 
             order.remaining_quantity -= executed_quantity
