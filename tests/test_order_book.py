@@ -1,6 +1,7 @@
 
 from experiments.order_book import OrderBook
 from experiments.order_model import Order
+from experiments.trade import Trade
 
 # Order(order_id, side, price, original_quantity, remaining_quantity, timestamp)
 
@@ -397,3 +398,97 @@ def test_emptying_a_price_level():
     assert 101 not in book.sell_levels
     assert 102 in book.sell_levels
     assert book.get_best_ask() == 102
+
+
+def test_trade_records_price_quantity_and_counterparties():
+    book = OrderBook()
+    sell = Order("S1", "SELL", 102.0, 20, 20, 1)
+    buy = Order("B1", "BUY", 105.0, 12, 12, 2)
+
+    book.add_resting_order(sell)
+    book.process_order(buy)
+
+    assert len(book.trades) == 1
+
+    trade = book.trades[0]
+    assert trade.price == 102.0
+    assert trade.quantity == 12
+    assert trade.buy_order_id == "B1"
+    assert trade.sell_order_id == "S1"
+    assert trade.timestamp == 2
+
+
+def test_trade_records_correct_counterparties_for_incoming_sell():
+    book = OrderBook()
+    buy = Order("B1", "BUY", 105.0, 20, 20, 1)
+    sell = Order("S1", "SELL", 102.0, 8, 8, 2)
+
+    book.add_resting_order(buy)
+    book.process_order(sell)
+
+    assert len(book.trades) == 1
+
+    trade = book.trades[0]
+    assert trade.buy_order_id == "B1"
+    assert trade.sell_order_id == "S1"
+    assert trade.price == 105.0
+    assert trade.quantity == 8
+
+
+def test_trade_ids_are_sequential():
+    book = OrderBook()
+    book.add_resting_order(
+        Order("S1", "SELL", 102.0, 5, 5, 1)
+    )
+    book.add_resting_order(
+        Order("S2", "SELL", 103.0, 5, 5, 2)
+    )
+
+    buy = Order("B1", "BUY", 105.0, 8, 8, 3)
+    book.process_order(buy)
+
+    assert len(book.trades) == 2
+    assert book.trades[0].trade_id == "T000001"
+    assert book.trades[1].trade_id == "T000002"
+    assert book.trades[0].sell_order_id == "S1"
+    assert book.trades[1].sell_order_id == "S2"
+
+
+def test_partial_fill_creates_accurate_trade_record():
+    book = OrderBook()
+    sell = Order("S1", "SELL", 102.0, 20, 20, 1)
+    buy = Order("B1", "BUY", 105.0, 12, 12, 2)
+
+    book.add_resting_order(sell)
+    book.process_order(buy)
+
+    trade = book.trades[0]
+
+    assert trade.quantity == 12
+    assert sell.remaining_quantity == 8
+    assert buy.remaining_quantity == 0
+    assert trade.quantity + sell.remaining_quantity == sell.original_quantity
+
+
+def test_multiple_partial_fills_create_separate_records():
+    book = OrderBook()
+    first_sell = Order("S1", "SELL", 102.0, 5, 5, 1)
+    second_sell = Order("S2", "SELL", 103.0, 10, 10, 2)
+    buy = Order("B1", "BUY", 105.0, 12, 12, 3)
+
+    book.add_resting_order(first_sell)
+    book.add_resting_order(second_sell)
+    book.process_order(buy)
+
+    assert len(book.trades) == 2
+
+    assert book.trades[0].quantity == 5
+    assert book.trades[0].sell_order_id == "S1"
+
+    assert book.trades[1].quantity == 7
+    assert book.trades[1].sell_order_id == "S2"
+
+    assert buy.remaining_quantity == 0
+    assert first_sell.remaining_quantity == 0
+    assert second_sell.remaining_quantity == 3
+
