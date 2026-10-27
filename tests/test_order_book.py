@@ -492,3 +492,60 @@ def test_multiple_partial_fills_create_separate_records():
     assert first_sell.remaining_quantity == 0
     assert second_sell.remaining_quantity == 3
 
+
+def test_snapshot_prices_quantities_and_spread():
+    book = OrderBook()
+    book.add_resting_order(Order("B1", "BUY", 100, 10, 10, 1))
+    book.add_resting_order(Order("B2", "BUY", 101, 20, 20, 2))
+    book.add_resting_order(Order("S1", "SELL", 103, 15, 15, 3))
+    book.add_resting_order(Order("S2", "SELL", 102, 5, 5, 4))
+
+    snapshot = book.get_snapshot()
+
+    assert [level["price"] for level in snapshot["bids"]] == [101, 100]
+    assert [level["price"] for level in snapshot["asks"]] == [102, 103]
+    assert snapshot["bids"][0]["quantity"] == 20
+    assert snapshot["asks"][0]["quantity"] == 5
+    assert snapshot["best_bid"] == 101
+    assert snapshot["best_ask"] == 102
+    assert snapshot["spread"] == 1
+
+
+def test_snapshot_aggregates_orders_at_same_price():
+    book = OrderBook()
+    book.add_resting_order(Order("B1", "BUY", 100, 4, 4, 1))
+    book.add_resting_order(Order("B2", "BUY", 100, 6, 6, 2))
+
+    snapshot = book.get_snapshot()
+    level = snapshot["bids"][0]
+
+    assert level["price"] == 100
+    assert level["quantity"] == 10
+    assert [order["order_id"] for order in level["orders"]] == ["B1", "B2"]
+
+
+def test_snapshot_empty_book():
+    book = OrderBook()
+    snapshot = book.get_snapshot()
+
+    assert snapshot == {
+        "bids": [],
+        "asks": [],
+        "best_bid": None,
+        "best_ask": None,
+        "spread": None
+    }
+
+
+def test_snapshot_does_not_mutate_book():
+    book = OrderBook()
+    order = Order("B1", "BUY", 100, 10, 10, 1)
+    book.add_resting_order(order)
+
+    first = book.get_snapshot()
+    second = book.get_snapshot()
+
+    assert first == second
+    assert order.remaining_quantity == 10
+    assert len(book.buy_levels[100].orders) == 1
+

@@ -104,52 +104,62 @@ class OrderBook:
 
         if order.remaining_quantity > 0:
             self.add_resting_order(order)
+    
+    def get_snapshot(self):
+        bids = [
+            {
+                "price": price,
+                "orders": [
+                    {
+                        "order_id": order.order_id,
+                        "quantity": order.remaining_quantity
+                    }
+                    for order in self.buy_levels[price].orders
+                ],
+                "quantity": sum(
+                    order.remaining_quantity
+                    for order in self.buy_levels[price].orders
+                )
+            }
+            for price in sorted(self.buy_levels, reverse=True)
+        ]
+
+        asks = [
+            {
+                "price": price,
+                "orders": [
+                    {
+                        "order_id": order.order_id,
+                        "quantity": order.remaining_quantity
+                    }
+                    for order in self.sell_levels[price].orders
+                ],
+                "quantity": sum(
+                    order.remaining_quantity
+                    for order in self.sell_levels[price].orders
+                )
+            }
+            for price in sorted(self.sell_levels)
+        ]
+
+        best_bid = self.get_best_bid()
+        best_ask = self.get_best_ask()
+
+        spread = None
+        if best_bid is not None and best_ask is not None:
+            spread = best_ask - best_bid
+
+        return {
+            "bids": bids,
+            "asks": asks,
+            "best_bid": best_bid,
+            "best_ask": best_ask,
+            "spread": spread
+        }
 
 
-    def process_order(self, order: Order):
-        if order.side == "BUY":
-            opposing_levels = self.sell_levels
-            get_best_price = self.get_best_ask
-            is_crossing = lambda: (
-                get_best_price() is not None
-                and order.price >= get_best_price()
-            )
-        else:
-            opposing_levels = self.buy_levels
-            get_best_price = self.get_best_bid
-            is_crossing = lambda: (
-                get_best_price() is not None
-                and order.price <= get_best_price()
-            )
 
-        while order.remaining_quantity > 0 and is_crossing():
-            best_price = get_best_price()
-            level = opposing_levels[best_price]
-            resting_order = level.get_first_order()
-
-            executed_quantity = min(
-                order.remaining_quantity,
-                resting_order.remaining_quantity
-            )
-
-            self._record_trade(
-            incoming_order=order,
-            resting_order=resting_order,
-            price=best_price,
-            quantity=executed_quantity
-            )
-
-            order.remaining_quantity -= executed_quantity
-            resting_order.remaining_quantity -= executed_quantity
-
-            if resting_order.remaining_quantity == 0:
-                level.remove_first_order()
-
-                if level.is_empty():
-                    opposing_levels.pop(best_price)
-
-        if order.remaining_quantity > 0:
-            self.add_resting_order(order)
+    
 
 
 
