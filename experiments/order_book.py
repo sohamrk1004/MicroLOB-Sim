@@ -32,60 +32,45 @@ class OrderBook:
 
         return min(self.sell_levels)
 
+    
     def process_order(self, order: Order):
         if order.side == "BUY":
-            best_ask = self.get_best_ask()
-
-            if best_ask is not None and order.price >= best_ask:
-                level = self.sell_levels[best_ask]
-                resting_order = level.get_first_order()
-
-                executed_quantity = min(
-                    order.remaining_quantity,
-                    resting_order.remaining_quantity
-                )
-
-                order.remaining_quantity -= executed_quantity
-                resting_order.remaining_quantity -= executed_quantity
-
-                if resting_order.remaining_quantity == 0:
-                    level.remove_first_order()
-
-                    if level.is_empty():
-                        self.sell_levels.pop(best_ask)
-
-                if order.remaining_quantity > 0:
-                    self.add_resting_order(order)
-
-            else:
-                self.add_resting_order(order)
-
+            opposing_levels = self.sell_levels
+            get_best_price = self.get_best_ask
+            is_crossing = lambda: (
+                get_best_price() is not None
+                and order.price >= get_best_price()
+            )
         else:
-            best_bid = self.get_best_bid()
+            opposing_levels = self.buy_levels
+            get_best_price = self.get_best_bid
+            is_crossing = lambda: (
+                get_best_price() is not None
+                and order.price <= get_best_price()
+            )
 
-            if best_bid is not None and order.price <= best_bid:
-                level = self.buy_levels[best_bid]
-                resting_order = level.get_first_order()
+        while order.remaining_quantity > 0 and is_crossing():
+            best_price = get_best_price()
+            level = opposing_levels[best_price]
+            resting_order = level.get_first_order()
 
-                executed_quantity = min(
-                    order.remaining_quantity,
-                    resting_order.remaining_quantity
-                )
+            executed_quantity = min(
+                order.remaining_quantity,
+                resting_order.remaining_quantity
+            )
 
-                order.remaining_quantity -= executed_quantity
-                resting_order.remaining_quantity -= executed_quantity
+            order.remaining_quantity -= executed_quantity
+            resting_order.remaining_quantity -= executed_quantity
 
-                if resting_order.remaining_quantity == 0:
-                    level.remove_first_order()
+            if resting_order.remaining_quantity == 0:
+                level.remove_first_order()
 
-                    if level.is_empty():
-                        self.buy_levels.pop(best_bid)
+                if level.is_empty():
+                    opposing_levels.pop(best_price)
 
-                if order.remaining_quantity > 0:
-                    self.add_resting_order(order)
+        if order.remaining_quantity > 0:
+            self.add_resting_order(order)
 
-            else:
-                self.add_resting_order(order)
 
 
 if __name__ == "__main__":
