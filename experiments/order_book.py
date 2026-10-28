@@ -10,8 +10,18 @@ class OrderBook:
         self.sell_levels = {}
         self.trades = []
         self._next_trade_id = 1
+        self.buy_submitted_quantity = 0
+        self.sell_submitted_quantity = 0
+        self.buy_executed_quantity = 0
+        self.sell_executed_quantity = 0
+        self.buy_cancelled_quantity = 0
+        self.sell_cancelled_quantity = 0
 
+    
     def add_resting_order(self, order: Order):
+        if order.remaining_quantity == 0:
+            raise ValueError("Cannot add a completed order to the book")
+
         if order.side == "BUY":
             levels = self.buy_levels
         else:
@@ -21,6 +31,7 @@ class OrderBook:
             levels[order.price] = LimitLevel(order.price)
 
         levels[order.price].add_order(order)
+
 
     def get_best_bid(self):
         if not self.buy_levels:
@@ -59,8 +70,15 @@ class OrderBook:
 
         self.trades.append(trade)
         self._next_trade_id += 1
+        
+        self.buy_executed_quantity += quantity
+        self.sell_executed_quantity += quantity
 
     def process_order(self, order: Order):
+        if order.side == "BUY":
+            self.buy_submitted_quantity += order.original_quantity
+        else:
+            self.sell_submitted_quantity += order.original_quantity
         if order.side == "BUY":
             opposing_levels = self.sell_levels
             get_best_price = self.get_best_ask
@@ -156,6 +174,55 @@ class OrderBook:
             "best_ask": best_ask,
             "spread": spread
         }
+    
+    
+    def get_resting_quantity(self, side=None):
+        total = 0
+        if side is None:
+            level_sets = (self.buy_levels, self.sell_levels)
+        elif side == "BUY":
+            level_sets = (self.buy_levels,)
+        elif side == "SELL":
+            level_sets = (self.sell_levels,)
+        else:
+            raise ValueError("Side must be BUY, SELL, or None")
+
+        for levels in level_sets:
+            for level in levels.values():
+                for order in level.orders:
+                    total += order.remaining_quantity
+        return total
+
+
+    def get_quantity_accounting(self):
+        return {
+            "buy": {
+                "submitted": self.buy_submitted_quantity,
+                "executed": self.buy_executed_quantity,
+                "cancelled": self.buy_cancelled_quantity,
+                "resting": self.get_resting_quantity("BUY")
+            },
+            "sell": {
+                "submitted": self.sell_submitted_quantity,
+                "executed": self.sell_executed_quantity,
+                "cancelled": self.sell_cancelled_quantity,
+                "resting": self.get_resting_quantity("SELL")
+            }
+        }
+
+
+    def check_quantity_conservation(self):
+        totals = self.get_quantity_accounting()
+        for side in ("buy", "sell"):
+            account = totals[side]
+            if account["submitted"] != (
+                account["executed"]
+                + account["cancelled"]
+                + account["resting"]
+            ):
+                return False
+        return True
+
 
 
 
