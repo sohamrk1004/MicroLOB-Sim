@@ -223,7 +223,27 @@ class OrderBook:
                 return False
         return True
 
+    def cancel_order(self, order_id):
+        for side, levels in (
+            ("BUY", self.buy_levels),
+            ("SELL", self.sell_levels)
+        ):
+            for price, level in list(levels.items()):
+                for index, order in enumerate(level.orders):
+                    if order.order_id == order_id:
+                        cancelled_quantity = order.remaining_quantity
+                        level.orders.pop(index)
 
+                        if side == "BUY":
+                            self.buy_cancelled_quantity += cancelled_quantity
+                        else:
+                            self.sell_cancelled_quantity += cancelled_quantity
+
+                        if level.is_empty():
+                            del levels[price]
+
+                        return True
+        return False
 
 
     
