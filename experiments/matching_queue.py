@@ -20,9 +20,9 @@ while incoming_quantity > 0 and index < len(sell_queue):
     print(order_id, "executed", execution_quantity)
 
     if resting_quantity == 0:
-    print(order_id, "fully consumed")
-    index += 1
-    continue
+        print(order_id, "fully consumed")
+        index += 1
+        continue
 
 print(order_id, "remaining:", resting_quantity)
 

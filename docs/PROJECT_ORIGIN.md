@@ -1,24 +1,46 @@
-# Project Origin and Core Motivation
 
-## 1. Initial Motivation
+# Project Origin
 
-MicroLOB-Sim was created to explore financial market microstructure through direct computational modeling. The goal is to make the behavior of a limit order book understandable by implementing its core mechanics explicitly rather than relying entirely on a black-box library.
+## Where the Idea Started
 
-## 2. Why a Limit Order Book?
+I became interested in how electronic exchanges match buyers and sellers and how thousands of orders can be organized without losing their execution priority.
 
-A limit order book connects computer science, software engineering, and market design.
+I wanted to understand what happens inside an exchange when someone submits an order. How does the system decide which order executes first? What happens when an order is only partially filled? How does the book change after a cancellation?
 
-- **Deterministic state transitions:** Given the same initial state and the same sequence of inputs, a deterministic matching implementation should produce the same resulting state.
-- **Queue mechanics:** Orders at the same price require a consistent priority rule, such as FIFO.
-- **Data structures:** Separating price levels and their order queues makes the representation of the book explicit and testable.
-- **Reproducibility:** A transparent implementation makes it easier to inspect execution behavior, identify errors, and verify results through tests.
+I could study these concepts theoretically, but I wanted to understand them at the implementation level. That was the reason I started MicroLOB-Sim.
 
-## 3. Central Engineering Question
+## Why I Built It From First Principles
 
-How can a limit order book and its matching behavior be represented, implemented, and tested in a way that makes the resulting state transitions understandable and reproducible?
+I decided to build the matching engine myself instead of depending on an existing order book library. I wanted to make the data structures and matching rules explicit so I could understand every state transition.
 
-## 4. Implementation Approach
+This also meant dealing with details that an existing library would normally handle internally. I had to decide how to represent orders, organize price levels, preserve FIFO priority and update quantities after each execution.
 
-The project uses Python to represent orders, organize price levels, maintain the two sides of the book, and process crossing limit orders.
+I started with a relatively small implementation and expanded it as I understood the requirements better.
 
-Development proceeds through small implementation changes and tests that check expected behavior. Limitations are documented alongside completed functionality so that the project's description remains consistent with the code.
+## How My Thinking Changed
+
+Initially, I was mainly focused on getting orders to match correctly. As the implementation grew, I realized that producing the correct trade was only part of the problem.
+
+The book also had to remain valid after every operation. A partial fill could leave an order with an incorrect remaining quantity. Cancellation could affect quantity accounting. Removing the last order at a price could leave an empty level behind.
+
+These problems changed how I approached the project. I began treating correctness as something that needed to be checked continuously, not just something demonstrated by a few successful examples.
+
+This led to quantity conservation checks, invariant audits, deterministic replay, randomized event testing and dedicated edge-case tests.
+
+## Engineering Decisions That Changed the Project
+
+One decision was to keep the matching implementation readable rather than immediately optimizing every operation. The Python list used by `LimitLevel` makes FIFO behaviour straightforward to inspect, even though removing an order from the middle becomes expensive as the queue grows.
+
+The cancellation benchmark gave me a reason to investigate alternative data structures. I started exploring a doubly linked list combined with an order ID map, while keeping it separate from the main matching engine until its correctness and performance can be evaluated.
+
+Another important decision was to preserve failures and development decisions in the repository. The decision log and iteration log help me understand why the implementation changed, rather than only showing its latest state.
+
+## What I Want to Investigate Next
+
+The matching engine is the computational foundation of the project. I want to use it to study questions that go beyond whether orders execute correctly.
+
+The next stage will involve acquiring and examining historical market data, understanding its properties and deciding which assumptions can reasonably be investigated through simulation.
+
+I am particularly interested in how differences in information and execution behaviour can affect market participants. I want those questions to emerge from the data and literature rather than decide the conclusions in advance.
+
+MicroLOB-Sim began as an attempt to understand how an exchange matches orders. It is gradually becoming a way for me to investigate the computational and empirical side of market microstructure.
