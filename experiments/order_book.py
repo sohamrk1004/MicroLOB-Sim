@@ -2,6 +2,8 @@
 from experiments.order_model import Order
 from experiments.limit_level import LimitLevel
 from experiments.trade import Trade
+from experiments.invariant_audit import check_book_invariants
+
 
 class OrderBook:
 
@@ -10,15 +12,25 @@ class OrderBook:
         self.sell_levels = {}
         self.trades = []
         self._next_trade_id = 1
+
         self.buy_submitted_quantity = 0
         self.sell_submitted_quantity = 0
+
         self.buy_executed_quantity = 0
         self.sell_executed_quantity = 0
+
         self.buy_cancelled_quantity = 0
         self.sell_cancelled_quantity = 0
 
-    
     def add_resting_order(self, order: Order):
+        self._insert_resting_order(order)
+
+        if order.side == "BUY":
+            self.buy_submitted_quantity += order.original_quantity
+        else:
+            self.sell_submitted_quantity += order.original_quantity
+
+    def _insert_resting_order(self, order: Order):
         if order.remaining_quantity == 0:
             raise ValueError("Cannot add a completed order to the book")
 
@@ -32,7 +44,6 @@ class OrderBook:
 
         levels[order.price].add_order(order)
 
-
     def get_best_bid(self):
         if not self.buy_levels:
             return None
@@ -44,7 +55,7 @@ class OrderBook:
             return None
 
         return min(self.sell_levels)
-    
+
     def _record_trade(
         self,
         incoming_order: Order,
@@ -70,32 +81,38 @@ class OrderBook:
 
         self.trades.append(trade)
         self._next_trade_id += 1
-        
+
         self.buy_executed_quantity += quantity
         self.sell_executed_quantity += quantity
 
     def process_order(self, order: Order):
+        if order.remaining_quantity == 0:
+            raise ValueError("Cannot process a completed order")
+
         if order.side == "BUY":
             self.buy_submitted_quantity += order.original_quantity
+            opposing_levels = self.sell_levels
         else:
             self.sell_submitted_quantity += order.original_quantity
-        if order.side == "BUY":
-            opposing_levels = self.sell_levels
-            get_best_price = self.get_best_ask
-            is_crossing = lambda: (
-                get_best_price() is not None
-                and order.price >= get_best_price()
-            )
-        else:
             opposing_levels = self.buy_levels
-            get_best_price = self.get_best_bid
-            is_crossing = lambda: (
-                get_best_price() is not None
-                and order.price <= get_best_price()
-            )
 
-        while order.remaining_quantity > 0 and is_crossing():
-            best_price = get_best_price()
+        # The incoming order is temporarily outside the book.
+        check_book_invariants(self, pending_order=order)
+
+        while order.remaining_quantity > 0:
+
+            if order.side == "BUY":
+                best_price = self.get_best_ask()
+
+                if best_price is None or order.price < best_price:
+                    break
+
+            else:
+                best_price = self.get_best_bid()
+
+                if best_price is None or order.price > best_price:
+                    break
+
             level = opposing_levels[best_price]
             resting_order = level.get_first_order()
 
@@ -114,15 +131,23 @@ class OrderBook:
             order.remaining_quantity -= executed_quantity
             resting_order.remaining_quantity -= executed_quantity
 
+            # Remove completed resting orders before auditing the book.
             if resting_order.remaining_quantity == 0:
                 level.remove_first_order()
 
                 if level.is_empty():
                     opposing_levels.pop(best_price)
 
+            # Both orders and execution counters now reflect the trade.
+            check_book_invariants(self, pending_order=order)
+
+        # Place any unfilled quantity into the book.
         if order.remaining_quantity > 0:
-            self.add_resting_order(order)
-    
+            self._insert_resting_order(order)
+
+        # The incoming order is now either resting or fully executed.
+        check_book_invariants(self)
+
     def get_snapshot(self):
         bids = [
             {
@@ -164,6 +189,7 @@ class OrderBook:
         best_ask = self.get_best_ask()
 
         spread = None
+
         if best_bid is not None and best_ask is not None:
             spread = best_ask - best_bid
 
@@ -174,10 +200,10 @@ class OrderBook:
             "best_ask": best_ask,
             "spread": spread
         }
-    
-    
+
     def get_resting_quantity(self, side=None):
         total = 0
+
         if side is None:
             level_sets = (self.buy_levels, self.sell_levels)
         elif side == "BUY":
@@ -191,8 +217,8 @@ class OrderBook:
             for level in levels.values():
                 for order in level.orders:
                     total += order.remaining_quantity
-        return total
 
+        return total
 
     def get_quantity_accounting(self):
         return {
@@ -210,17 +236,19 @@ class OrderBook:
             }
         }
 
-
     def check_quantity_conservation(self):
         totals = self.get_quantity_accounting()
+
         for side in ("buy", "sell"):
             account = totals[side]
+
             if account["submitted"] != (
                 account["executed"]
                 + account["cancelled"]
                 + account["resting"]
             ):
                 return False
+
         return True
 
     def cancel_order(self, order_id):
@@ -230,6 +258,7 @@ class OrderBook:
         ):
             for price, level in list(levels.items()):
                 for index, order in enumerate(level.orders):
+
                     if order.order_id == order_id:
                         cancelled_quantity = order.remaining_quantity
                         level.orders.pop(index)
@@ -242,34 +271,18 @@ class OrderBook:
                         if level.is_empty():
                             del levels[price]
 
+                        check_book_invariants(self)
                         return True
+
         return False
 
 
-    
-
-
-
 if __name__ == "__main__":
-    order1 = Order(
-        "BUY001", "BUY", 100.0, 20, 20, 1
-    )
-
-    order2 = Order(
-        "BUY002", "BUY", 101.0, 30, 30, 2
-    )
-
-    order3 = Order(
-        "BUY003", "BUY", 100.0, 15, 15, 3
-    )
-
-    order4 = Order(
-        "SELL001", "SELL", 103.0, 25, 25, 4
-    )
-
-    order5 = Order(
-        "SELL002", "SELL", 104.0, 40, 40, 5
-    )
+    order1 = Order("BUY001", "BUY", 100.0, 20, 20, 1)
+    order2 = Order("BUY002", "BUY", 101.0, 30, 30, 2)
+    order3 = Order("BUY003", "BUY", 100.0, 15, 15, 3)
+    order4 = Order("SELL001", "SELL", 103.0, 25, 25, 4)
+    order5 = Order("SELL002", "SELL", 104.0, 40, 40, 5)
 
     book = OrderBook()
 
