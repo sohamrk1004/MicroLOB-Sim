@@ -10,3 +10,4 @@ class Trade:
     price: float
     quantity: int
     timestamp: int
+
