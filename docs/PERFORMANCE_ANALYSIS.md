@@ -156,6 +156,18 @@ These are related, but they are not interchangeable. A measured result can be af
 
 The cancellation measurements are consistent with the expected linear cost of searching and removing an order from the current list-based queue. A separate implementation would need its own benchmark before a performance comparison could be made.
 
+
+### Scaling Interpretation
+
+The median cancellation time increases as the number of resting orders grows. At 50,000 orders, the median is 1,127,150 ns, compared with 2,700 ns at 100 orders.
+
+This behaviour is consistent with the current cancellation implementation. The engine searches for the target order and removes it from a Python list. Both operations can require work proportional to the number of orders in the queue.
+
+The measurements do not establish an exact complexity by themselves. The theoretical analysis predicts linear complexity for this cancellation path, while the benchmark shows that the observed execution time increases with queue size.
+
+Individual measurements also vary. Interpreter overhead, memory behaviour and other processes running on the machine can affect the recorded time. I therefore report the median of 30 runs at each queue size and retain the raw measurements in the CSV file.
+
+
 ## Further Work
 
 The next performance investigation is to compare the current list-based queue with a doubly linked list combined with an order ID map.
